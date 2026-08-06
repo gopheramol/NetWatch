@@ -1,0 +1,26 @@
+# Go
+/bin/
+*.test
+*.out
+
+# NetWatch runtime data
+/data/
+*.db
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local
+
+# Frontend
+web/node_modules/
+web/.next/
+web/out/
+web/.env*.local
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
