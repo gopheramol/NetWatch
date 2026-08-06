@@ -20,6 +20,13 @@ type Config struct {
 	Retention RetentionConfig `mapstructure:"retention"`
 	Logging   LoggingConfig   `mapstructure:"logging"`
 	Battery   BatteryConfig   `mapstructure:"battery"`
+	SysMetrics SysMetricsConfig `mapstructure:"sysmetrics"`
+}
+
+// SysMetricsConfig configures the system resource metrics monitor.
+type SysMetricsConfig struct {
+	Enabled         bool          `mapstructure:"enabled"`
+	IntervalSeconds int           `mapstructure:"interval_seconds"`
 }
 
 // ServerConfig configures the HTTP API server.
@@ -156,6 +163,9 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("battery.enabled", true)
 	v.SetDefault("battery.low_threshold_pct", 50)
 	v.SetDefault("battery.check_interval", "60s")
+
+	v.SetDefault("sysmetrics.enabled", true)
+	v.SetDefault("sysmetrics.interval_seconds", 60)
 }
 
 func (c *Config) validate() error {

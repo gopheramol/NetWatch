@@ -83,9 +83,26 @@ export interface CurrentStatus {
   ongoing_outage?: Outage;
 }
 
+export interface SystemMetrics {
+  id: string;
+  timestamp: string;
+  cpu_percent: number;
+  ram_used_mb: number;
+  ram_total_mb: number;
+  ram_percent: number;
+  disk_used_gb: number;
+  disk_total_gb: number;
+  disk_percent: number;
+  cpu_temp_c?: number;
+  battery_present?: boolean;
+  battery_percent?: number;
+  battery_charging?: boolean;
+}
+
 export interface ListResponse<T> {
   from?: string;
   to?: string;
   count: number;
   data: T[] | null;
 }
+

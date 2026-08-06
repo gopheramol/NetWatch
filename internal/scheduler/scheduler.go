@@ -14,6 +14,7 @@ import (
 	"github.com/gopheramol/NetWatch/internal/repository"
 	"github.com/gopheramol/NetWatch/internal/services/retention"
 	"github.com/gopheramol/NetWatch/internal/services/speedtest"
+	"github.com/gopheramol/NetWatch/internal/sysmetrics"
 	"github.com/gopheramol/NetWatch/internal/telegram"
 	"github.com/robfig/cron/v3"
 	"go.uber.org/zap"
@@ -21,20 +22,23 @@ import (
 
 // Scheduler owns every recurring background job in the application.
 type Scheduler struct {
-	monitorSvc   *monitor.Service
-	speedtestSvc *speedtest.Service
-	retentionSvc *retention.Service
-	batterySvc   *battery.Service
-	analytics    analytics.Engine
-	notifier     telegram.Notifier
-	settingsRepo repository.SettingsRepository
-	logger       *zap.Logger
+	monitorSvc    *monitor.Service
+	speedtestSvc  *speedtest.Service
+	retentionSvc  *retention.Service
+	batterySvc    *battery.Service
+	sysMetricsSvc sysmetrics.Service
+	analytics     analytics.Engine
+	notifier      telegram.Notifier
+	settingsRepo  repository.SettingsRepository
+	logger        *zap.Logger
 
 	defaultMonitorInterval   time.Duration
 	defaultSpeedtestInterval time.Duration
 	cleanupInterval          time.Duration
 	batteryEnabled           bool
 	batteryInterval          time.Duration
+	sysMetricsEnabled        bool
+	sysMetricsInterval       time.Duration
 
 	cron   *cron.Cron
 	wg     sync.WaitGroup
@@ -44,11 +48,13 @@ type Scheduler struct {
 // Config controls the interval-based jobs. Daily/weekly summaries run on
 // fixed wall-clock schedules (see Start) rather than intervals.
 type Config struct {
-	MonitorInterval   time.Duration
-	SpeedTestInterval time.Duration
-	CleanupInterval   time.Duration
-	BatteryEnabled    bool
-	BatteryInterval   time.Duration
+	MonitorInterval    time.Duration
+	SpeedTestInterval  time.Duration
+	CleanupInterval    time.Duration
+	BatteryEnabled     bool
+	BatteryInterval    time.Duration
+	SysMetricsEnabled  bool
+	SysMetricsInterval time.Duration
 }
 
 // New builds a Scheduler with all its dependencies.
@@ -58,6 +64,7 @@ func New(
 	speedtestSvc *speedtest.Service,
 	retentionSvc *retention.Service,
 	batterySvc *battery.Service,
+	sysMetricsSvc sysmetrics.Service,
 	engine analytics.Engine,
 	notifier telegram.Notifier,
 	settingsRepo repository.SettingsRepository,
@@ -68,6 +75,7 @@ func New(
 		speedtestSvc:             speedtestSvc,
 		retentionSvc:             retentionSvc,
 		batterySvc:               batterySvc,
+		sysMetricsSvc:            sysMetricsSvc,
 		analytics:                engine,
 		notifier:                 notifier,
 		settingsRepo:             settingsRepo,
@@ -77,6 +85,8 @@ func New(
 		cleanupInterval:          cfg.CleanupInterval,
 		batteryEnabled:           cfg.BatteryEnabled,
 		batteryInterval:          cfg.BatteryInterval,
+		sysMetricsEnabled:        cfg.SysMetricsEnabled,
+		sysMetricsInterval:       cfg.SysMetricsInterval,
 		cron:                     cron.New(),
 	}
 }
@@ -112,6 +122,16 @@ func (s *Scheduler) Start(ctx context.Context) {
 			}
 		})
 	}
+
+	if s.sysMetricsEnabled && s.sysMetricsSvc != nil {
+		s.wg.Add(1)
+		go s.runLoop(ctx, "sysmetrics", func() time.Duration { return s.sysMetricsInterval }, true, func(loopCtx context.Context) {
+			if _, err := s.sysMetricsSvc.Collect(loopCtx); err != nil {
+				s.logger.Error("scheduler: sysmetrics collection failed", zap.Error(err))
+			}
+		})
+	}
+
 
 	if _, err := s.cron.AddFunc("59 23 * * *", func() { s.sendDailySummary(ctx) }); err != nil {
 		s.logger.Error("scheduler: failed to register daily summary job", zap.Error(err))

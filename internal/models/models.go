@@ -133,3 +133,21 @@ type CurrentStatus struct {
 	MonthAvailabilityPct float64            `json:"month_availability_pct"`
 	OngoingOutage        *Outage            `json:"ongoing_outage,omitempty"`
 }
+
+// SystemMetrics holds CPU, Memory, Disk, CPU Temperature, and Battery measurements.
+type SystemMetrics struct {
+	ID              string    `json:"id"`
+	Timestamp       time.Time `json:"timestamp"`
+	CPUPercent      float64   `json:"cpu_percent"`
+	RAMUsedMB       float64   `json:"ram_used_mb"`
+	RAMTotalMB      float64   `json:"ram_total_mb"`
+	RAMPercent      float64   `json:"ram_percent"`
+	DiskUsedGB      float64   `json:"disk_used_gb"`
+	DiskTotalGB     float64   `json:"disk_total_gb"`
+	DiskPercent     float64   `json:"disk_percent"`
+	CPUTempC        float64   `json:"cpu_temp_c,omitempty"`
+	BatteryPresent  bool      `json:"battery_present"`
+	BatteryPercent  float64   `json:"battery_percent"`
+	BatteryCharging bool      `json:"battery_charging"`
+}
+

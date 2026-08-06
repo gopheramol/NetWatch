@@ -22,6 +22,7 @@ const (
 	BucketDailyStats    = "daily_stats"
 	BucketMonthlyStats  = "monthly_stats"
 	BucketNotifications = "notifications"
+	BucketSysMetrics    = "sys_metrics"
 )
 
 var allBuckets = []string{
@@ -32,6 +33,7 @@ var allBuckets = []string{
 	BucketDailyStats,
 	BucketMonthlyStats,
 	BucketNotifications,
+	BucketSysMetrics,
 }
 
 // DB wraps a bbolt database handle.

@@ -60,3 +60,12 @@ type NotificationRepository interface {
 	Save(ctx context.Context, notification *models.Notification) error
 	List(ctx context.Context, limit int) ([]models.Notification, error)
 }
+
+// SystemMetricsRepository persists system metrics snapshots.
+type SystemMetricsRepository interface {
+	Save(ctx context.Context, metrics *models.SystemMetrics) error
+	Latest(ctx context.Context) (*models.SystemMetrics, error)
+	Range(ctx context.Context, from, to time.Time, limit int) ([]models.SystemMetrics, error)
+	DeleteOlderThan(ctx context.Context, cutoff time.Time) (int, error)
+}
+

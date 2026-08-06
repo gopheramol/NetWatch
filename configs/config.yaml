@@ -49,3 +49,8 @@ battery:
   enabled: true
   low_threshold_pct: 50
   check_interval: 60s
+
+sysmetrics:
+  enabled: true
+  interval_seconds: 60
+

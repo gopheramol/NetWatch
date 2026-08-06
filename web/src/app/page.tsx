@@ -14,6 +14,7 @@ import { DailyAvailabilityChart } from "@/components/DailyAvailabilityChart";
 import { DowntimeHistory } from "@/components/DowntimeHistory";
 import { MonthlyStatsTable } from "@/components/MonthlyStatsTable";
 import { SettingsPanel } from "@/components/SettingsPanel";
+import { SystemMetricsCard } from "@/components/SystemMetricsCard";
 import { formatSpeed, formatDateTime } from "@/lib/format";
 
 export default function Dashboard() {
@@ -71,6 +72,8 @@ export default function Dashboard() {
             value={status.data ? `${status.data.month_availability_pct.toFixed(2)}%` : "—"}
           />
         </div>
+
+        <SystemMetricsCard />
 
         <Card title="Latency (last 24h)">
           <LatencyChart checks={connectivity.data?.data ?? []} />

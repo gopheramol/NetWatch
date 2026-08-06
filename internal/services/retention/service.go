@@ -16,6 +16,7 @@ import (
 // POST /api/settings takes effect on the next cleanup cycle without a restart.
 type Service struct {
 	connRepo       repository.ConnectivityRepository
+	sysRepo        repository.SystemMetricsRepository
 	settingsRepo   repository.SettingsRepository
 	defaultRawDays int
 	logger         *zap.Logger
@@ -23,11 +24,11 @@ type Service struct {
 
 // NewService builds the retention Service. defaultRawDays is used only if
 // settings have not yet been persisted.
-func NewService(connRepo repository.ConnectivityRepository, settingsRepo repository.SettingsRepository, defaultRawDays int, logger *zap.Logger) *Service {
-	return &Service{connRepo: connRepo, settingsRepo: settingsRepo, defaultRawDays: defaultRawDays, logger: logger}
+func NewService(connRepo repository.ConnectivityRepository, sysRepo repository.SystemMetricsRepository, settingsRepo repository.SettingsRepository, defaultRawDays int, logger *zap.Logger) *Service {
+	return &Service{connRepo: connRepo, sysRepo: sysRepo, settingsRepo: settingsRepo, defaultRawDays: defaultRawDays, logger: logger}
 }
 
-// Run deletes raw connectivity checks older than the retention window.
+// Run deletes raw connectivity checks and system metrics older than the retention window.
 // Daily and monthly summary buckets are never touched here — they are kept
 // forever by design.
 func (s *Service) Run(ctx context.Context) error {
@@ -43,9 +44,16 @@ func (s *Service) Run(ctx context.Context) error {
 		return err
 	}
 
+	sysDeleted, sysErr := s.sysRepo.DeleteOlderThan(ctx, cutoff)
+	if sysErr != nil {
+		s.logger.Error("retention: failed to delete old system metrics", zap.Error(sysErr))
+	}
+
 	s.logger.Info("retention: cleanup complete",
 		zap.Int("deleted_connectivity_checks", deleted),
+		zap.Int("deleted_sys_metrics", sysDeleted),
 		zap.Time("cutoff", cutoff),
 	)
 	return nil
 }
+

@@ -7,6 +7,7 @@ import type {
   Outage,
   Settings,
   SpeedTestResult,
+  SystemMetrics,
 } from "./types";
 
 const API_BASE_URL =
@@ -79,6 +80,17 @@ export const api = {
     request<MonthlyStats>(`/api/analytics/monthly?month=${month}`),
 
   getSettings: () => request<Settings>("/api/settings"),
+
+  getMetricsLatest: async (): Promise<SystemMetrics | null> => {
+    try {
+      return await request<SystemMetrics>("/api/metrics/latest");
+    } catch {
+      return null;
+    }
+  },
+
+  getMetricsHistory: (params?: { from?: string; to?: string; limit?: number }) =>
+    request<SystemMetrics[]>(`/api/metrics/history${toQuery(params)}`),
 
   saveSettings: (settings: Settings) => post<Settings>("/api/settings", settings),
 

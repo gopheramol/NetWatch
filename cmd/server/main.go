@@ -27,6 +27,7 @@ import (
 	"github.com/gopheramol/NetWatch/internal/scheduler"
 	"github.com/gopheramol/NetWatch/internal/services/retention"
 	"github.com/gopheramol/NetWatch/internal/services/speedtest"
+	"github.com/gopheramol/NetWatch/internal/sysmetrics"
 	"github.com/gopheramol/NetWatch/internal/telegram"
 	"github.com/gopheramol/NetWatch/internal/utils"
 	"github.com/joho/godotenv"
@@ -77,6 +78,7 @@ func run(cfg *config.Config, logger *zap.Logger) error {
 	dailyRepo := repository.NewDailyStatsRepository(db)
 	monthlyRepo := repository.NewMonthlyStatsRepository(db)
 	notifRepo := repository.NewNotificationRepository(db)
+	sysRepo := repository.NewSystemMetricsRepository(db)
 	settingsRepo := repository.NewSettingsRepository(db, models.Settings{
 		TelegramEnabled:        cfg.Telegram.Enabled,
 		TelegramBotToken:       cfg.Telegram.BotToken,
@@ -90,35 +92,42 @@ func run(cfg *config.Config, logger *zap.Logger) error {
 
 	engine := analytics.NewEngine(dailyRepo, monthlyRepo, logger)
 	notifier := telegram.NewService(settingsRepo, notifRepo, logger)
+	batteryReader := battery.NewLinuxReader()
+	sysMetricsSvc := sysmetrics.NewService(sysRepo, batteryReader, logger)
 
 	monitorSvc := monitor.NewService(cfg.Monitor, connRepo, downtimeRepo, speedRepo, engine, notifier, logger)
 	speedtestSvc := speedtest.NewService(
 		speedtest.NewOoklaProvider(), speedRepo, engine, notifier, settingsRepo,
 		cfg.SpeedTest.MinDownloadMbps, cfg.SpeedTest.MinUploadMbps, cfg.SpeedTest.ReportEnabled, logger,
 	)
-	retentionSvc := retention.NewService(connRepo, settingsRepo, cfg.Retention.RawDataDays, logger)
+	retentionSvc := retention.NewService(connRepo, sysRepo, settingsRepo, cfg.Retention.RawDataDays, logger)
 	batterySvc := battery.NewService(battery.NewLinuxReader(), settingsRepo, notifier, cfg.Battery.LowThresholdPct, logger)
 
 	sched := scheduler.New(scheduler.Config{
-		MonitorInterval:   time.Duration(cfg.Monitor.IntervalSeconds) * time.Second,
-		SpeedTestInterval: time.Duration(cfg.SpeedTest.IntervalMinutes) * time.Minute,
-		CleanupInterval:   cfg.Retention.CleanupInterval,
-		BatteryEnabled:    cfg.Battery.Enabled,
-		BatteryInterval:   cfg.Battery.CheckInterval,
-	}, monitorSvc, speedtestSvc, retentionSvc, batterySvc, engine, notifier, settingsRepo, logger)
+		MonitorInterval:    time.Duration(cfg.Monitor.IntervalSeconds) * time.Second,
+		SpeedTestInterval:  time.Duration(cfg.SpeedTest.IntervalMinutes) * time.Minute,
+		CleanupInterval:    cfg.Retention.CleanupInterval,
+		BatteryEnabled:     cfg.Battery.Enabled,
+		BatteryInterval:    cfg.Battery.CheckInterval,
+		SysMetricsEnabled:  cfg.SysMetrics.Enabled,
+		SysMetricsInterval: time.Duration(cfg.SysMetrics.IntervalSeconds) * time.Second,
+	}, monitorSvc, speedtestSvc, retentionSvc, batterySvc, sysMetricsSvc, engine, notifier, settingsRepo, logger)
 
 	router := api.NewRouter(api.Dependencies{
-		MonitorSvc:   monitorSvc,
-		SpeedTestSvc: speedtestSvc,
-		Analytics:    engine,
-		Notifier:     notifier,
-		ConnRepo:     connRepo,
-		SpeedRepo:    speedRepo,
-		DowntimeRepo: downtimeRepo,
-		SettingsRepo: settingsRepo,
-		Logger:       logger,
-		CORSOrigins:  cfg.Server.CORSOrigins,
+		MonitorSvc:    monitorSvc,
+		SpeedTestSvc:  speedtestSvc,
+		SysMetricsSvc: sysMetricsSvc,
+		Analytics:     engine,
+		Notifier:      notifier,
+		ConnRepo:      connRepo,
+		SpeedRepo:     speedRepo,
+		DowntimeRepo:  downtimeRepo,
+		SettingsRepo:  settingsRepo,
+		Logger:        logger,
+		CORSOrigins:   cfg.Server.CORSOrigins,
 	})
+
+	botListener := telegram.NewBotListener(telegram.NewClient(), settingsRepo, monitorSvc, speedtestSvc, sysMetricsSvc, downtimeRepo, logger)
 
 	httpServer := &http.Server{
 		Addr:    net.JoinHostPort(cfg.Server.Host, strconv.Itoa(cfg.Server.Port)),
@@ -129,6 +138,8 @@ func run(cfg *config.Config, logger *zap.Logger) error {
 	defer stop()
 
 	sched.Start(ctx)
+	botListener.Start(ctx)
+
 	if err := notifier.NotifyServiceStarted(ctx); err != nil {
 		logger.Warn("failed to send service-started notification", zap.Error(err))
 	}

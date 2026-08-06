@@ -12,6 +12,7 @@ import (
 	"github.com/gopheramol/NetWatch/internal/monitor"
 	"github.com/gopheramol/NetWatch/internal/repository"
 	"github.com/gopheramol/NetWatch/internal/services/speedtest"
+	"github.com/gopheramol/NetWatch/internal/sysmetrics"
 	"github.com/gopheramol/NetWatch/internal/telegram"
 	"go.uber.org/zap"
 )
@@ -20,6 +21,7 @@ import (
 type Dependencies struct {
 	MonitorSvc   *monitor.Service
 	SpeedTestSvc *speedtest.Service
+	SysMetricsSvc sysmetrics.Service
 	Analytics    analytics.Engine
 	Notifier     telegram.Notifier
 	ConnRepo     repository.ConnectivityRepository
@@ -59,6 +61,9 @@ func NewRouter(deps Dependencies) *gin.Engine {
 		apiGroup.GET("/speed/history", h.getSpeedHistory)
 		apiGroup.POST("/speedtest", h.postSpeedTest)
 
+		apiGroup.GET("/metrics/latest", h.getMetricsLatest)
+		apiGroup.GET("/metrics/history", h.getMetricsHistory)
+
 		apiGroup.GET("/downtime", h.getDowntime)
 
 		apiGroup.GET("/analytics/daily", h.getAnalyticsDaily)
@@ -72,3 +77,4 @@ func NewRouter(deps Dependencies) *gin.Engine {
 
 	return r
 }
+
