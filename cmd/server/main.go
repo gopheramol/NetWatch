@@ -18,6 +18,7 @@ import (
 
 	"github.com/gopheramol/NetWatch/internal/analytics"
 	"github.com/gopheramol/NetWatch/internal/api"
+	"github.com/gopheramol/NetWatch/internal/battery"
 	"github.com/gopheramol/NetWatch/internal/config"
 	"github.com/gopheramol/NetWatch/internal/database"
 	"github.com/gopheramol/NetWatch/internal/models"
@@ -77,26 +78,33 @@ func run(cfg *config.Config, logger *zap.Logger) error {
 	monthlyRepo := repository.NewMonthlyStatsRepository(db)
 	notifRepo := repository.NewNotificationRepository(db)
 	settingsRepo := repository.NewSettingsRepository(db, models.Settings{
-		TelegramEnabled:    cfg.Telegram.Enabled,
-		TelegramBotToken:   cfg.Telegram.BotToken,
-		TelegramChatID:     cfg.Telegram.ChatID,
-		MonitorIntervalSec: cfg.Monitor.IntervalSeconds,
-		SpeedIntervalHours: cfg.SpeedTest.IntervalHours,
-		RetentionDays:      cfg.Retention.RawDataDays,
+		TelegramEnabled:        cfg.Telegram.Enabled,
+		TelegramBotToken:       cfg.Telegram.BotToken,
+		TelegramChatID:         cfg.Telegram.ChatID,
+		MonitorIntervalSec:     cfg.Monitor.IntervalSeconds,
+		SpeedIntervalHours:     cfg.SpeedTest.IntervalHours,
+		RetentionDays:          cfg.Retention.RawDataDays,
+		BatteryLowThresholdPct: cfg.Battery.LowThresholdPct,
 	})
 
 	engine := analytics.NewEngine(dailyRepo, monthlyRepo, logger)
 	notifier := telegram.NewService(settingsRepo, notifRepo, logger)
 
 	monitorSvc := monitor.NewService(cfg.Monitor, connRepo, downtimeRepo, speedRepo, engine, notifier, logger)
-	speedtestSvc := speedtest.NewService(speedtest.NewOoklaProvider(), speedRepo, engine, logger)
+	speedtestSvc := speedtest.NewService(
+		speedtest.NewOoklaProvider(), speedRepo, engine, notifier,
+		cfg.SpeedTest.MinDownloadMbps, cfg.SpeedTest.MinUploadMbps, logger,
+	)
 	retentionSvc := retention.NewService(connRepo, settingsRepo, cfg.Retention.RawDataDays, logger)
+	batterySvc := battery.NewService(battery.NewLinuxReader(), settingsRepo, notifier, cfg.Battery.LowThresholdPct, logger)
 
 	sched := scheduler.New(scheduler.Config{
 		MonitorInterval:   time.Duration(cfg.Monitor.IntervalSeconds) * time.Second,
 		SpeedTestInterval: time.Duration(cfg.SpeedTest.IntervalHours) * time.Hour,
 		CleanupInterval:   cfg.Retention.CleanupInterval,
-	}, monitorSvc, speedtestSvc, retentionSvc, engine, notifier, settingsRepo, logger)
+		BatteryEnabled:    cfg.Battery.Enabled,
+		BatteryInterval:   cfg.Battery.CheckInterval,
+	}, monitorSvc, speedtestSvc, retentionSvc, batterySvc, engine, notifier, settingsRepo, logger)
 
 	router := api.NewRouter(api.Dependencies{
 		MonitorSvc:   monitorSvc,
@@ -120,6 +128,9 @@ func run(cfg *config.Config, logger *zap.Logger) error {
 	defer stop()
 
 	sched.Start(ctx)
+	if err := notifier.NotifyServiceStarted(ctx); err != nil {
+		logger.Warn("failed to send service-started notification", zap.Error(err))
+	}
 
 	serverErrCh := make(chan error, 1)
 	go func() {
@@ -143,6 +154,9 @@ func run(cfg *config.Config, logger *zap.Logger) error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.Server.ShutdownTimeout)
 	defer cancel()
 
+	if err := notifier.NotifyServiceStopped(shutdownCtx); err != nil {
+		logger.Warn("failed to send service-stopped notification", zap.Error(err))
+	}
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {
 		logger.Error("server: graceful shutdown failed", zap.Error(err))
 	}

@@ -41,6 +41,10 @@ func (h *handler) postSettings(c *gin.Context) {
 		badRequest(c, fmt.Errorf("telegram_bot_token and telegram_chat_id are required when telegram_enabled is true"))
 		return
 	}
+	if settings.BatteryLowThresholdPct < 0 || settings.BatteryLowThresholdPct > 100 {
+		badRequest(c, fmt.Errorf("battery_low_threshold_pct must be between 0 and 100"))
+		return
+	}
 
 	if err := h.deps.SettingsRepo.Save(c.Request.Context(), &settings); err != nil {
 		internalError(c, err)

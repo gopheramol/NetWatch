@@ -23,8 +23,11 @@ Speed tests (every 6h) ───────────────────
   network, behind a `Provider` interface so the backend can be swapped later.
 - **Analytics** maintained incrementally (daily/monthly summary buckets) —
   no full-table scans on every request.
-- **Telegram alerts**: Internet Down, Internet Restored, Daily Summary,
-  Weekly Summary, and a Test button — all runtime-configurable via the API.
+- **Telegram alerts**: Internet Down/Restored, Service Started/Stopped,
+  High Latency/Latency Normal, Slow Speed, Battery Low/Restored, Daily
+  Summary, Weekly Summary, and a Test button — see [Notifications](#notifications).
+- **Battery/UPS monitor**: reads `/sys/class/power_supply` on Linux; a
+  no-op (never alerts, never errors) on hosts without a battery.
 - **Retention**: raw connectivity checks are pruned after N days (default
   90); daily/monthly summaries are kept forever.
 - **Dashboard**: Next.js + Tailwind + Recharts, dark mode, live-polling.
@@ -36,16 +39,17 @@ cmd/server/            entry point, dependency wiring, graceful shutdown
 internal/
   api/                 Gin routes & handlers
   analytics/           incremental daily/monthly stats engine
+  battery/             battery/UPS reader + low/restored alert state machine
   config/              Viper-based config.yaml + env loading
   database/            bbolt open/bucket management + generic JSON helpers
   middleware/           logging, recovery, CORS
   models/              shared domain types
-  monitor/             connectivity checker + outage detection
+  monitor/             connectivity checker + outage + high-latency detection
   repository/          bbolt-backed persistence, one file per domain
   scheduler/           cron/ticker orchestration of all background jobs
   services/
     retention/         raw-data cleanup
-    speedtest/         Provider abstraction + Ookla implementation
+    speedtest/         Provider abstraction + Ookla implementation + slow-speed alert
   telegram/            Bot API client, message templates, notifier service
   utils/               logger, id generation
 configs/config.yaml    default configuration
@@ -106,13 +110,36 @@ container restart (`docker compose restart backend`) — no rebuild.
 
 Edit `configs/config.yaml` or override via `NETWATCH_*` environment
 variables (e.g. `NETWATCH_MONITOR_INTERVAL_SECONDS=30`,
-`NETWATCH_SERVER_PORT=9090`). See the file for every available key:
-server, database, telegram, monitor, speedtest, retention, logging.
+`NETWATCH_SERVER_PORT=9090`), or drop a gitignored `.env` at the repo root
+for local secrets (loaded automatically on startup). See the file for every
+available key: server, database, telegram, monitor, speedtest, retention,
+logging, battery.
 
-Some settings — Telegram credentials, monitor/speed-test interval, and
-retention days — are also runtime-configurable via `GET`/`POST
-/api/settings` and take effect without a restart (the scheduler re-reads
-them each tick).
+Some settings — Telegram credentials, monitor/speed-test interval,
+retention days, and the battery-low threshold — are also runtime-
+configurable via `GET`/`POST /api/settings` (or the dashboard's Settings
+panel) and take effect without a restart. High-latency and slow-speed
+thresholds are config.yaml-only for now.
+
+## Notifications
+
+| Trigger | Alert | Notes |
+|---|---|---|
+| N consecutive failed checks | 🔴 Internet Down | `monitor.failure_threshold` |
+| Recovery after an outage | 🟢 Internet Restored | includes outage duration |
+| N consecutive checks above a latency threshold | 🟠 High Latency Detected | `monitor.high_latency_threshold_ms` / `_occurrences`; connection stays "up" |
+| Latency drops back under the threshold | 🟢 Latency Back to Normal | one-shot on the transition, like outages |
+| A completed speed test falls below a minimum | 🐌 Slow Speed Detected | `speedtest.min_download_mbps` / `min_upload_mbps`; `0` disables |
+| Battery/UPS charge at or below a threshold | 🪫 Battery Low | `battery.low_threshold_pct` (default 50%); no-op without a battery |
+| Battery charge recovers above the threshold | 🔌 Battery Restored | |
+| Process starts | 🚀 NetWatch Started | so a crash-and-restart isn't silent |
+| Process shuts down (graceful) | 🛑 NetWatch Stopped | sent just before the HTTP server closes |
+| Once a day at 23:59 | 📊 Daily Summary | |
+| Every Sunday at 23:59 | 📈 Weekly Summary | |
+| `POST /api/telegram/test` | ✅ Test Notification | |
+
+All of them respect the global `telegram_enabled` toggle and are logged to
+the `notifications` bucket regardless of delivery success.
 
 ## REST API
 

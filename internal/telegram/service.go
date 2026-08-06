@@ -19,6 +19,13 @@ type Notifier interface {
 	NotifyDailySummary(ctx context.Context, stats models.DailyStats) error
 	NotifyWeeklySummary(ctx context.Context, days []models.DailyStats) error
 	NotifyTest(ctx context.Context) error
+	NotifyServiceStarted(ctx context.Context) error
+	NotifyServiceStopped(ctx context.Context) error
+	NotifyBatteryLow(ctx context.Context, pct, thresholdPct float64) error
+	NotifyBatteryRestored(ctx context.Context, pct float64) error
+	NotifyHighLatency(ctx context.Context, latencyMs, thresholdMs float64) error
+	NotifyLatencyNormal(ctx context.Context, latencyMs float64) error
+	NotifySlowSpeed(ctx context.Context, result models.SpeedTestResult, minDownloadMbps, minUploadMbps float64) error
 }
 
 type service struct {
@@ -92,4 +99,32 @@ func (s *service) NotifyWeeklySummary(ctx context.Context, days []models.DailySt
 
 func (s *service) NotifyTest(ctx context.Context) error {
 	return s.send(ctx, models.NotificationTest, testMessage())
+}
+
+func (s *service) NotifyServiceStarted(ctx context.Context) error {
+	return s.send(ctx, models.NotificationServiceUp, serviceStartedMessage())
+}
+
+func (s *service) NotifyServiceStopped(ctx context.Context) error {
+	return s.send(ctx, models.NotificationServiceDown, serviceStoppedMessage())
+}
+
+func (s *service) NotifyBatteryLow(ctx context.Context, pct, thresholdPct float64) error {
+	return s.send(ctx, models.NotificationBatteryLow, batteryLowMessage(pct, thresholdPct))
+}
+
+func (s *service) NotifyBatteryRestored(ctx context.Context, pct float64) error {
+	return s.send(ctx, models.NotificationBatteryOk, batteryRestoredMessage(pct))
+}
+
+func (s *service) NotifyHighLatency(ctx context.Context, latencyMs, thresholdMs float64) error {
+	return s.send(ctx, models.NotificationHighLatency, highLatencyMessage(latencyMs, thresholdMs))
+}
+
+func (s *service) NotifyLatencyNormal(ctx context.Context, latencyMs float64) error {
+	return s.send(ctx, models.NotificationLatencyNormal, latencyNormalMessage(latencyMs))
+}
+
+func (s *service) NotifySlowSpeed(ctx context.Context, result models.SpeedTestResult, minDownloadMbps, minUploadMbps float64) error {
+	return s.send(ctx, models.NotificationSlowSpeed, slowSpeedMessage(result, minDownloadMbps, minUploadMbps))
 }

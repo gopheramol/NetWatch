@@ -19,21 +19,25 @@ import (
 // failures, and answers live status queries. It is the single writer of
 // in-memory connectivity state; all reads go through GetCurrentStatus.
 type Service struct {
-	checker      *Checker
-	connRepo     repository.ConnectivityRepository
-	downtimeRepo repository.DowntimeRepository
-	speedRepo    repository.SpeedTestRepository
-	analytics    analytics.Engine
-	notifier     telegram.Notifier
-	logger       *zap.Logger
-	threshold    int
+	checker                *Checker
+	connRepo               repository.ConnectivityRepository
+	downtimeRepo           repository.DowntimeRepository
+	speedRepo              repository.SpeedTestRepository
+	analytics              analytics.Engine
+	notifier               telegram.Notifier
+	logger                 *zap.Logger
+	threshold              int
+	highLatencyThresholdMs float64
+	highLatencyOccurrences int
 
-	mu                  sync.Mutex
-	consecutiveFailures int
-	failureStreakStart  time.Time
-	currentStatus       models.ConnectivityStatus
-	lastCheck           *models.ConnectivityCheck
-	uptimeSince         time.Time
+	mu                     sync.Mutex
+	consecutiveFailures    int
+	failureStreakStart     time.Time
+	currentStatus          models.ConnectivityStatus
+	lastCheck              *models.ConnectivityCheck
+	uptimeSince            time.Time
+	consecutiveHighLatency int
+	isHighLatency          bool
 }
 
 // NewService builds the connectivity Service, restoring in-memory state
@@ -48,16 +52,18 @@ func NewService(
 	logger *zap.Logger,
 ) *Service {
 	s := &Service{
-		checker:       NewChecker(cfg),
-		connRepo:      connRepo,
-		downtimeRepo:  downtimeRepo,
-		speedRepo:     speedRepo,
-		analytics:     engine,
-		notifier:      notifier,
-		logger:        logger,
-		threshold:     cfg.FailureThreshold,
-		currentStatus: models.StatusUp,
-		uptimeSince:   time.Now(),
+		checker:                NewChecker(cfg),
+		connRepo:               connRepo,
+		downtimeRepo:           downtimeRepo,
+		speedRepo:              speedRepo,
+		analytics:              engine,
+		notifier:               notifier,
+		logger:                 logger,
+		threshold:              cfg.FailureThreshold,
+		highLatencyThresholdMs: cfg.HighLatencyThresholdMs,
+		highLatencyOccurrences: cfg.HighLatencyOccurrences,
+		currentStatus:          models.StatusUp,
+		uptimeSince:            time.Now(),
 	}
 
 	ctx := context.Background()
@@ -127,6 +133,8 @@ func (s *Service) RunCheck(ctx context.Context) error {
 	s.currentStatus = models.StatusUp
 	s.uptimeSince = check.Timestamp
 
+	s.evaluateLatency(ctx, check)
+
 	if wasDown {
 		ongoing, err := s.downtimeRepo.GetOngoing(ctx)
 		if err != nil {
@@ -151,6 +159,36 @@ func (s *Service) RunCheck(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// evaluateLatency tracks a separate consecutive-occurrences streak for
+// "connection is up but slow", independent of the outage state machine, and
+// alerts on the high/normal transition. Caller must hold s.mu.
+func (s *Service) evaluateLatency(ctx context.Context, check models.ConnectivityCheck) {
+	if s.highLatencyThresholdMs <= 0 || s.highLatencyOccurrences <= 0 {
+		return
+	}
+
+	if check.LatencyMs <= s.highLatencyThresholdMs {
+		s.consecutiveHighLatency = 0
+		if s.isHighLatency {
+			s.isHighLatency = false
+			if err := s.notifier.NotifyLatencyNormal(ctx, check.LatencyMs); err != nil {
+				s.logger.Error("monitor: failed to send latency normal notification", zap.Error(err))
+			}
+			s.logger.Info("monitor: latency back to normal", zap.Float64("latency_ms", check.LatencyMs))
+		}
+		return
+	}
+
+	s.consecutiveHighLatency++
+	if s.consecutiveHighLatency == s.highLatencyOccurrences && !s.isHighLatency {
+		s.isHighLatency = true
+		if err := s.notifier.NotifyHighLatency(ctx, check.LatencyMs, s.highLatencyThresholdMs); err != nil {
+			s.logger.Error("monitor: failed to send high latency notification", zap.Error(err))
+		}
+		s.logger.Warn("monitor: high latency detected", zap.Float64("latency_ms", check.LatencyMs), zap.Float64("threshold_ms", s.highLatencyThresholdMs))
+	}
 }
 
 // GetCurrentStatus builds a live snapshot combining in-memory state,

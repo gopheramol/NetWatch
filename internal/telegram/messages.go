@@ -116,3 +116,62 @@ func weeklySummaryMessage(days []models.DailyStats) string {
 func testMessage() string {
 	return "✅ <b>Test Notification</b>\n\nYour NetWatch Telegram integration is working correctly. 🎉"
 }
+
+func serviceStartedMessage() string {
+	return "🚀 <b>NetWatch Started</b>\n\nMonitoring is now running."
+}
+
+func serviceStoppedMessage() string {
+	return "🛑 <b>NetWatch Stopped</b>\n\nMonitoring has shut down — no alerts will fire until it's back up."
+}
+
+func batteryLowMessage(pct float64, thresholdPct float64) string {
+	return fmt.Sprintf(
+		"🪫 <b>Battery Low</b>\n\n"+
+			"🔋 Level: %.0f%% (threshold %.0f%%)\n\n"+
+			"Check your server's power/UPS status.",
+		pct, thresholdPct,
+	)
+}
+
+func batteryRestoredMessage(pct float64) string {
+	return fmt.Sprintf(
+		"🔌 <b>Battery Restored</b>\n\n🔋 Level: %.0f%%",
+		pct,
+	)
+}
+
+func highLatencyMessage(latencyMs, thresholdMs float64) string {
+	return fmt.Sprintf(
+		"🟠 <b>High Latency Detected</b>\n\n"+
+			"⚡ Latency: %.0f ms (threshold %.0f ms)\n\n"+
+			"Your connection is up but sluggish.",
+		latencyMs, thresholdMs,
+	)
+}
+
+func latencyNormalMessage(latencyMs float64) string {
+	return fmt.Sprintf(
+		"🟢 <b>Latency Back to Normal</b>\n\n⚡ Latency: %.0f ms",
+		latencyMs,
+	)
+}
+
+func slowSpeedMessage(result models.SpeedTestResult, minDownloadMbps, minUploadMbps float64) string {
+	return fmt.Sprintf(
+		"🐌 <b>Slow Speed Detected</b>\n\n"+
+			"⬇️ Download: %.1f Mbps (min %.1f)\n"+
+			"⬆️ Upload: %.1f Mbps (min %.1f)\n"+
+			"🌐 ISP: %s",
+		result.DownloadMbps, minDownloadMbps,
+		result.UploadMbps, minUploadMbps,
+		valueOrDash(result.ISP),
+	)
+}
+
+func valueOrDash(s string) string {
+	if s == "" {
+		return "—"
+	}
+	return s
+}

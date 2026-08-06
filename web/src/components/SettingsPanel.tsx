@@ -79,7 +79,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
               onChange={(v) => setSettings({ ...settings, telegram_chat_id: v })}
             />
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <NumberField
                 label="Monitor (sec)"
                 value={settings.monitor_interval_sec}
@@ -94,6 +94,11 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
                 label="Retention (days)"
                 value={settings.retention_days}
                 onChange={(v) => setSettings({ ...settings, retention_days: v })}
+              />
+              <NumberField
+                label="Battery alert (%)"
+                value={settings.battery_low_threshold_pct}
+                onChange={(v) => setSettings({ ...settings, battery_low_threshold_pct: v })}
               />
             </div>
 

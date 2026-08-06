@@ -82,12 +82,13 @@ type MonthlyStats struct {
 
 // Settings holds runtime-configurable application settings persisted in the DB.
 type Settings struct {
-	TelegramEnabled    bool   `json:"telegram_enabled"`
-	TelegramBotToken   string `json:"telegram_bot_token,omitempty"`
-	TelegramChatID     string `json:"telegram_chat_id,omitempty"`
-	MonitorIntervalSec int    `json:"monitor_interval_sec"`
-	SpeedIntervalHours int    `json:"speed_interval_hours"`
-	RetentionDays      int    `json:"retention_days"`
+	TelegramEnabled        bool    `json:"telegram_enabled"`
+	TelegramBotToken       string  `json:"telegram_bot_token,omitempty"`
+	TelegramChatID         string  `json:"telegram_chat_id,omitempty"`
+	MonitorIntervalSec     int     `json:"monitor_interval_sec"`
+	SpeedIntervalHours     int     `json:"speed_interval_hours"`
+	RetentionDays          int     `json:"retention_days"`
+	BatteryLowThresholdPct float64 `json:"battery_low_threshold_pct"`
 }
 
 // NotificationType enumerates the kinds of Telegram notifications sent.
@@ -99,6 +100,13 @@ const (
 	NotificationDailySummary  NotificationType = "daily_summary"
 	NotificationWeeklySummary NotificationType = "weekly_summary"
 	NotificationTest          NotificationType = "test"
+	NotificationServiceUp     NotificationType = "service_started"
+	NotificationServiceDown   NotificationType = "service_stopped"
+	NotificationBatteryLow    NotificationType = "battery_low"
+	NotificationBatteryOk     NotificationType = "battery_restored"
+	NotificationHighLatency   NotificationType = "high_latency"
+	NotificationLatencyNormal NotificationType = "latency_normal"
+	NotificationSlowSpeed     NotificationType = "slow_speed"
 )
 
 // Notification records a sent (or attempted) Telegram notification for audit purposes.

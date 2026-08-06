@@ -19,6 +19,7 @@ type Config struct {
 	SpeedTest SpeedTestConfig `mapstructure:"speedtest"`
 	Retention RetentionConfig `mapstructure:"retention"`
 	Logging   LoggingConfig   `mapstructure:"logging"`
+	Battery   BatteryConfig   `mapstructure:"battery"`
 }
 
 // ServerConfig configures the HTTP API server.
@@ -43,18 +44,22 @@ type TelegramConfig struct {
 
 // MonitorConfig configures the connectivity monitor.
 type MonitorConfig struct {
-	IntervalSeconds  int    `mapstructure:"interval_seconds"`
-	HTTPCheckURL     string `mapstructure:"http_check_url"`
-	PingHost         string `mapstructure:"ping_host"`
-	DNSHost          string `mapstructure:"dns_host"`
-	TimeoutSeconds   int    `mapstructure:"timeout_seconds"`
-	FailureThreshold int    `mapstructure:"failure_threshold"`
+	IntervalSeconds        int     `mapstructure:"interval_seconds"`
+	HTTPCheckURL           string  `mapstructure:"http_check_url"`
+	PingHost               string  `mapstructure:"ping_host"`
+	DNSHost                string  `mapstructure:"dns_host"`
+	TimeoutSeconds         int     `mapstructure:"timeout_seconds"`
+	FailureThreshold       int     `mapstructure:"failure_threshold"`
+	HighLatencyThresholdMs float64 `mapstructure:"high_latency_threshold_ms"`
+	HighLatencyOccurrences int     `mapstructure:"high_latency_occurrences"`
 }
 
 // SpeedTestConfig configures periodic speed tests.
 type SpeedTestConfig struct {
-	IntervalHours int    `mapstructure:"interval_hours"`
-	Provider      string `mapstructure:"provider"`
+	IntervalHours   int     `mapstructure:"interval_hours"`
+	Provider        string  `mapstructure:"provider"`
+	MinDownloadMbps float64 `mapstructure:"min_download_mbps"`
+	MinUploadMbps   float64 `mapstructure:"min_upload_mbps"`
 }
 
 // RetentionConfig configures data retention/cleanup.
@@ -67,6 +72,15 @@ type RetentionConfig struct {
 type LoggingConfig struct {
 	Level string `mapstructure:"level"`
 	Path  string `mapstructure:"path"`
+}
+
+// BatteryConfig configures the optional local battery/UPS monitor. It is a
+// no-op (never alerts, never errors) on hosts without a battery, so it's
+// safe to leave enabled on a typical always-on-AC home server.
+type BatteryConfig struct {
+	Enabled         bool          `mapstructure:"enabled"`
+	LowThresholdPct float64       `mapstructure:"low_threshold_pct"`
+	CheckInterval   time.Duration `mapstructure:"check_interval"`
 }
 
 // Load reads configuration from the given path (directory or file) and env vars.
@@ -123,15 +137,23 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("monitor.dns_host", "google.com")
 	v.SetDefault("monitor.timeout_seconds", 5)
 	v.SetDefault("monitor.failure_threshold", 2)
+	v.SetDefault("monitor.high_latency_threshold_ms", 200)
+	v.SetDefault("monitor.high_latency_occurrences", 5)
 
 	v.SetDefault("speedtest.interval_hours", 6)
 	v.SetDefault("speedtest.provider", "ookla")
+	v.SetDefault("speedtest.min_download_mbps", 0)
+	v.SetDefault("speedtest.min_upload_mbps", 0)
 
 	v.SetDefault("retention.raw_data_days", 90)
 	v.SetDefault("retention.cleanup_interval", "24h")
 
 	v.SetDefault("logging.level", "info")
 	v.SetDefault("logging.path", "")
+
+	v.SetDefault("battery.enabled", true)
+	v.SetDefault("battery.low_threshold_pct", 50)
+	v.SetDefault("battery.check_interval", "60s")
 }
 
 func (c *Config) validate() error {

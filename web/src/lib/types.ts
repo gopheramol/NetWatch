@@ -67,6 +67,7 @@ export interface Settings {
   monitor_interval_sec: number;
   speed_interval_hours: number;
   retention_days: number;
+  battery_low_threshold_pct: number;
 }
 
 export interface CurrentStatus {
