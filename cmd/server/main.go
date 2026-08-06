@@ -28,12 +28,18 @@ import (
 	"github.com/gopheramol/NetWatch/internal/services/speedtest"
 	"github.com/gopheramol/NetWatch/internal/telegram"
 	"github.com/gopheramol/NetWatch/internal/utils"
+	"github.com/joho/godotenv"
 	"go.uber.org/zap"
 )
 
 func main() {
 	configPath := flag.String("config", "", "directory containing config.yaml")
 	flag.Parse()
+
+	// Optional: load NETWATCH_* overrides (e.g. Telegram credentials) from a
+	// local .env file. Silently ignored if absent — production deployments
+	// are expected to set real environment variables instead.
+	_ = godotenv.Load()
 
 	cfg, err := config.Load(*configPath)
 	if err != nil {
