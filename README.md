@@ -100,11 +100,33 @@ container restart (`docker compose restart backend`) — no rebuild.
 > (it runs in the browser, not the container), so changing it requires
 > `docker compose up -d --build frontend`.
 
+## Deploying to a remote home server
+
+`scripts/deploy.sh` rsyncs the repo to a remote host over SSH and (re)builds
++ starts the Docker Compose stack there — this is how the project itself
+gets deployed, not just a suggestion:
+
+```bash
+./scripts/deploy.sh amol@192.168.1.100
+# or: make deploy HOST=amol@192.168.1.100
+# or: NETWATCH_DEPLOY_HOST=amol@192.168.1.100 ./scripts/deploy.sh
+```
+
+Requires SSH key-based access (no interactive password prompts) and Docker
++ Compose v2 already installed on the target. The remote `.env` is never
+touched by the script — on a brand-new host with no `.env` yet, it copies
+`.env.example` over as a starting point and tells you to edit it (set
+`NEXT_PUBLIC_API_BASE_URL` to the server's real LAN IP, plus Telegram
+credentials) before the next deploy. Re-running the script is safe — it's
+just an rsync + `docker compose build && up -d`, and Docker's build cache
+keeps re-deploys fast when only a few files changed.
+
 ## Makefile targets
 
 `make build` / `run` / `test` / `lint` (backend); `make web-install` /
 `web-dev` / `web-build` / `web-lint` (frontend); `make docker-up` /
-`docker-down` / `docker-logs` (compose); `make clean`.
+`docker-down` / `docker-logs` (compose); `make deploy HOST=user@host`
+(remote deploy); `make clean`.
 
 ## Configuration
 

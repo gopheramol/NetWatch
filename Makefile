@@ -1,6 +1,7 @@
 .PHONY: build run test lint vet fmt tidy \
         web-install web-dev web-build web-lint \
         docker-build docker-up docker-down docker-logs \
+        deploy \
         clean
 
 BINARY := bin/netwatch-server
@@ -54,6 +55,12 @@ docker-down:
 
 docker-logs:
 	docker compose logs -f
+
+## Deploy
+
+# make deploy HOST=amol@192.168.1.100
+deploy:
+	./scripts/deploy.sh $(HOST)
 
 ## Housekeeping
 
