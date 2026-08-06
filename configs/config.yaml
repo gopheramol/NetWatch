@@ -26,11 +26,14 @@ monitor:
   high_latency_occurrences: 5
 
 speedtest:
-  interval_hours: 1
+  interval_minutes: 30
   provider: "ookla"
   # Alert if a completed speed test falls below these — 0 disables the check.
   min_download_mbps: 0
   min_upload_mbps: 0
+  # Send a Telegram report after every completed speed test (not just
+  # slow-speed alerts).
+  report_enabled: true
 
 retention:
   raw_data_days: 90

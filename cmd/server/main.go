@@ -82,7 +82,8 @@ func run(cfg *config.Config, logger *zap.Logger) error {
 		TelegramBotToken:       cfg.Telegram.BotToken,
 		TelegramChatID:         cfg.Telegram.ChatID,
 		MonitorIntervalSec:     cfg.Monitor.IntervalSeconds,
-		SpeedIntervalHours:     cfg.SpeedTest.IntervalHours,
+		SpeedIntervalMinutes:   cfg.SpeedTest.IntervalMinutes,
+		SpeedReportEnabled:     cfg.SpeedTest.ReportEnabled,
 		RetentionDays:          cfg.Retention.RawDataDays,
 		BatteryLowThresholdPct: cfg.Battery.LowThresholdPct,
 	})
@@ -92,15 +93,15 @@ func run(cfg *config.Config, logger *zap.Logger) error {
 
 	monitorSvc := monitor.NewService(cfg.Monitor, connRepo, downtimeRepo, speedRepo, engine, notifier, logger)
 	speedtestSvc := speedtest.NewService(
-		speedtest.NewOoklaProvider(), speedRepo, engine, notifier,
-		cfg.SpeedTest.MinDownloadMbps, cfg.SpeedTest.MinUploadMbps, logger,
+		speedtest.NewOoklaProvider(), speedRepo, engine, notifier, settingsRepo,
+		cfg.SpeedTest.MinDownloadMbps, cfg.SpeedTest.MinUploadMbps, cfg.SpeedTest.ReportEnabled, logger,
 	)
 	retentionSvc := retention.NewService(connRepo, settingsRepo, cfg.Retention.RawDataDays, logger)
 	batterySvc := battery.NewService(battery.NewLinuxReader(), settingsRepo, notifier, cfg.Battery.LowThresholdPct, logger)
 
 	sched := scheduler.New(scheduler.Config{
 		MonitorInterval:   time.Duration(cfg.Monitor.IntervalSeconds) * time.Second,
-		SpeedTestInterval: time.Duration(cfg.SpeedTest.IntervalHours) * time.Hour,
+		SpeedTestInterval: time.Duration(cfg.SpeedTest.IntervalMinutes) * time.Minute,
 		CleanupInterval:   cfg.Retention.CleanupInterval,
 		BatteryEnabled:    cfg.Battery.Enabled,
 		BatteryInterval:   cfg.Battery.CheckInterval,

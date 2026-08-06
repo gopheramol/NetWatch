@@ -67,6 +67,16 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
               />
             </label>
 
+            <label className="flex items-center justify-between text-sm">
+              <span>Send a report after every speed test</span>
+              <input
+                type="checkbox"
+                checked={settings.speed_report_enabled}
+                onChange={(e) => setSettings({ ...settings, speed_report_enabled: e.target.checked })}
+                className="h-4 w-4"
+              />
+            </label>
+
             <Field
               label="Bot token"
               value={settings.telegram_bot_token ?? ""}
@@ -86,9 +96,9 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
                 onChange={(v) => setSettings({ ...settings, monitor_interval_sec: v })}
               />
               <NumberField
-                label="Speed test (hr)"
-                value={settings.speed_interval_hours}
-                onChange={(v) => setSettings({ ...settings, speed_interval_hours: v })}
+                label="Speed test (min)"
+                value={settings.speed_interval_minutes}
+                onChange={(v) => setSettings({ ...settings, speed_interval_minutes: v })}
               />
               <NumberField
                 label="Retention (days)"

@@ -65,7 +65,8 @@ export interface Settings {
   telegram_bot_token?: string;
   telegram_chat_id?: string;
   monitor_interval_sec: number;
-  speed_interval_hours: number;
+  speed_interval_minutes: number;
+  speed_report_enabled: boolean;
   retention_days: number;
   battery_low_threshold_pct: number;
 }

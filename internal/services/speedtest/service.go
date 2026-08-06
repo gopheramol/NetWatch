@@ -16,33 +16,40 @@ import (
 // Service runs speed tests (scheduled or manually triggered), persists the
 // result, and folds it into the analytics engine.
 type Service struct {
-	provider        Provider
-	repo            repository.SpeedTestRepository
-	analytics       analytics.Engine
-	notifier        telegram.Notifier
-	minDownloadMbps float64
-	minUploadMbps   float64
-	logger          *zap.Logger
+	provider             Provider
+	repo                 repository.SpeedTestRepository
+	analytics            analytics.Engine
+	notifier             telegram.Notifier
+	settingsRepo         repository.SettingsRepository
+	minDownloadMbps      float64
+	minUploadMbps        float64
+	defaultReportEnabled bool
+	logger               *zap.Logger
 }
 
 // NewService builds the speed test Service around the given Provider.
 // minDownloadMbps/minUploadMbps of 0 disable the slow-speed alert.
+// defaultReportEnabled is used until Settings.SpeedReportEnabled is persisted.
 func NewService(
 	provider Provider,
 	repo repository.SpeedTestRepository,
 	engine analytics.Engine,
 	notifier telegram.Notifier,
+	settingsRepo repository.SettingsRepository,
 	minDownloadMbps, minUploadMbps float64,
+	defaultReportEnabled bool,
 	logger *zap.Logger,
 ) *Service {
 	return &Service{
-		provider:        provider,
-		repo:            repo,
-		analytics:       engine,
-		notifier:        notifier,
-		minDownloadMbps: minDownloadMbps,
-		minUploadMbps:   minUploadMbps,
-		logger:          logger,
+		provider:             provider,
+		repo:                 repo,
+		analytics:            engine,
+		notifier:             notifier,
+		settingsRepo:         settingsRepo,
+		minDownloadMbps:      minDownloadMbps,
+		minUploadMbps:        minUploadMbps,
+		defaultReportEnabled: defaultReportEnabled,
+		logger:               logger,
 	}
 }
 
@@ -76,8 +83,24 @@ func (s *Service) Run(ctx context.Context) (*models.SpeedTestResult, error) {
 	)
 
 	s.checkSlowSpeed(ctx, *result)
+	s.sendReport(ctx, *result)
 
 	return result, nil
+}
+
+// sendReport sends a routine "here's what the last test found" notification,
+// independent of whether it also triggered the slow-speed alert above.
+func (s *Service) sendReport(ctx context.Context, result models.SpeedTestResult) {
+	enabled := s.defaultReportEnabled
+	if settings, err := s.settingsRepo.Get(ctx); err == nil {
+		enabled = settings.SpeedReportEnabled
+	}
+	if !enabled {
+		return
+	}
+	if err := s.notifier.NotifySpeedReport(ctx, result); err != nil {
+		s.logger.Error("speedtest: failed to send speed report notification", zap.Error(err))
+	}
 }
 
 // checkSlowSpeed fires a one-shot alert when a completed test falls below

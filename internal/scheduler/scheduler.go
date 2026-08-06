@@ -141,10 +141,10 @@ func (s *Scheduler) monitorIntervalFromSettings() time.Duration {
 
 func (s *Scheduler) speedtestIntervalFromSettings() time.Duration {
 	settings, err := s.settingsRepo.Get(context.Background())
-	if err != nil || settings.SpeedIntervalHours <= 0 {
+	if err != nil || settings.SpeedIntervalMinutes <= 0 {
 		return s.defaultSpeedtestInterval
 	}
-	return time.Duration(settings.SpeedIntervalHours) * time.Hour
+	return time.Duration(settings.SpeedIntervalMinutes) * time.Minute
 }
 
 // runLoop runs fn on a ticker until ctx is canceled, re-resolving the

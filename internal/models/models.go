@@ -86,7 +86,8 @@ type Settings struct {
 	TelegramBotToken       string  `json:"telegram_bot_token,omitempty"`
 	TelegramChatID         string  `json:"telegram_chat_id,omitempty"`
 	MonitorIntervalSec     int     `json:"monitor_interval_sec"`
-	SpeedIntervalHours     int     `json:"speed_interval_hours"`
+	SpeedIntervalMinutes   int     `json:"speed_interval_minutes"`
+	SpeedReportEnabled     bool    `json:"speed_report_enabled"`
 	RetentionDays          int     `json:"retention_days"`
 	BatteryLowThresholdPct float64 `json:"battery_low_threshold_pct"`
 }
@@ -107,6 +108,7 @@ const (
 	NotificationHighLatency   NotificationType = "high_latency"
 	NotificationLatencyNormal NotificationType = "latency_normal"
 	NotificationSlowSpeed     NotificationType = "slow_speed"
+	NotificationSpeedReport   NotificationType = "speed_report"
 )
 
 // Notification records a sent (or attempted) Telegram notification for audit purposes.

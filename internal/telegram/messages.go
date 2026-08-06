@@ -157,6 +157,22 @@ func latencyNormalMessage(latencyMs float64) string {
 	)
 }
 
+func speedReportMessage(result models.SpeedTestResult) string {
+	return fmt.Sprintf(
+		"📶 <b>Speed Test Report</b>\n\n"+
+			"⬇️ Download: %.1f Mbps\n"+
+			"⬆️ Upload: %.1f Mbps\n"+
+			"📡 Ping: %.0f ms (jitter %.1f ms)\n"+
+			"🌐 ISP: %s\n"+
+			"🖥 Server: %s",
+		result.DownloadMbps,
+		result.UploadMbps,
+		result.PingMs, result.JitterMs,
+		valueOrDash(result.ISP),
+		valueOrDash(result.Server),
+	)
+}
+
 func slowSpeedMessage(result models.SpeedTestResult, minDownloadMbps, minUploadMbps float64) string {
 	return fmt.Sprintf(
 		"🐌 <b>Slow Speed Detected</b>\n\n"+

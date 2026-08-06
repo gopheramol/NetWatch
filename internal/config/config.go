@@ -56,10 +56,11 @@ type MonitorConfig struct {
 
 // SpeedTestConfig configures periodic speed tests.
 type SpeedTestConfig struct {
-	IntervalHours   int     `mapstructure:"interval_hours"`
+	IntervalMinutes int     `mapstructure:"interval_minutes"`
 	Provider        string  `mapstructure:"provider"`
 	MinDownloadMbps float64 `mapstructure:"min_download_mbps"`
 	MinUploadMbps   float64 `mapstructure:"min_upload_mbps"`
+	ReportEnabled   bool    `mapstructure:"report_enabled"`
 }
 
 // RetentionConfig configures data retention/cleanup.
@@ -140,10 +141,11 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("monitor.high_latency_threshold_ms", 200)
 	v.SetDefault("monitor.high_latency_occurrences", 5)
 
-	v.SetDefault("speedtest.interval_hours", 6)
+	v.SetDefault("speedtest.interval_minutes", 30)
 	v.SetDefault("speedtest.provider", "ookla")
 	v.SetDefault("speedtest.min_download_mbps", 0)
 	v.SetDefault("speedtest.min_upload_mbps", 0)
+	v.SetDefault("speedtest.report_enabled", true)
 
 	v.SetDefault("retention.raw_data_days", 90)
 	v.SetDefault("retention.cleanup_interval", "24h")
@@ -166,8 +168,8 @@ func (c *Config) validate() error {
 	if c.Monitor.IntervalSeconds <= 0 {
 		return fmt.Errorf("monitor.interval_seconds must be positive")
 	}
-	if c.SpeedTest.IntervalHours <= 0 {
-		return fmt.Errorf("speedtest.interval_hours must be positive")
+	if c.SpeedTest.IntervalMinutes <= 0 {
+		return fmt.Errorf("speedtest.interval_minutes must be positive")
 	}
 	if c.Retention.RawDataDays <= 0 {
 		return fmt.Errorf("retention.raw_data_days must be positive")

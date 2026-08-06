@@ -29,8 +29,8 @@ func (h *handler) postSettings(c *gin.Context) {
 		badRequest(c, fmt.Errorf("monitor_interval_sec must be positive"))
 		return
 	}
-	if settings.SpeedIntervalHours <= 0 {
-		badRequest(c, fmt.Errorf("speed_interval_hours must be positive"))
+	if settings.SpeedIntervalMinutes <= 0 {
+		badRequest(c, fmt.Errorf("speed_interval_minutes must be positive"))
 		return
 	}
 	if settings.RetentionDays <= 0 {

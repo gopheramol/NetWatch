@@ -9,7 +9,7 @@ and serves a live dashboard.
 Connectivity checks ──▶ bbolt ──▶ Analytics ──▶ REST API ──▶ Dashboard
       (every 15s)                    │                          │
                                       └──▶ Telegram alerts ◀─────┘
-Speed tests (every 6h) ───────────────────────▲
+Speed tests (every 30 min, configurable) ─────▲
 ```
 
 ## Features
@@ -19,13 +19,15 @@ Speed tests (every 6h) ───────────────────
   never needs raw-socket/root privileges).
 - **Outage detection**: N consecutive failures (configurable) open an
   outage record; recovery closes it and records the duration.
-- **Speed tests** every 6h (or on demand) via the public speedtest.net
-  network, behind a `Provider` interface so the backend can be swapped later.
+- **Speed tests** every 30 min by default (or on demand), behind a
+  `Provider` interface so the backend can be swapped later. The interval
+  is runtime-configurable down to the minute.
 - **Analytics** maintained incrementally (daily/monthly summary buckets) —
   no full-table scans on every request.
 - **Telegram alerts**: Internet Down/Restored, Service Started/Stopped,
-  High Latency/Latency Normal, Slow Speed, Battery Low/Restored, Daily
-  Summary, Weekly Summary, and a Test button — see [Notifications](#notifications).
+  High Latency/Latency Normal, Slow Speed, Speed Test Report, Battery
+  Low/Restored, Daily Summary, Weekly Summary, and a Test button — see
+  [Notifications](#notifications).
 - **Battery/UPS monitor**: reads `/sys/class/power_supply` on Linux; a
   no-op (never alerts, never errors) on hosts without a battery.
 - **Retention**: raw connectivity checks are pruned after N days (default
@@ -151,6 +153,7 @@ thresholds are config.yaml-only for now.
 | Recovery after an outage | 🟢 Internet Restored | includes outage duration |
 | N consecutive checks above a latency threshold | 🟠 High Latency Detected | `monitor.high_latency_threshold_ms` / `_occurrences`; connection stays "up" |
 | Latency drops back under the threshold | 🟢 Latency Back to Normal | one-shot on the transition, like outages |
+| Every completed speed test | 📶 Speed Test Report | `speed_report_enabled` (default on); routine, not just below-threshold |
 | A completed speed test falls below a minimum | 🐌 Slow Speed Detected | `speedtest.min_download_mbps` / `min_upload_mbps`; `0` disables |
 | Battery/UPS charge at or below a threshold | 🪫 Battery Low | `battery.low_threshold_pct` (default 50%); no-op without a battery |
 | Battery charge recovers above the threshold | 🔌 Battery Restored | |

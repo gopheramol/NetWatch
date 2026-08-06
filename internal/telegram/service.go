@@ -26,6 +26,7 @@ type Notifier interface {
 	NotifyHighLatency(ctx context.Context, latencyMs, thresholdMs float64) error
 	NotifyLatencyNormal(ctx context.Context, latencyMs float64) error
 	NotifySlowSpeed(ctx context.Context, result models.SpeedTestResult, minDownloadMbps, minUploadMbps float64) error
+	NotifySpeedReport(ctx context.Context, result models.SpeedTestResult) error
 }
 
 type service struct {
@@ -127,4 +128,8 @@ func (s *service) NotifyLatencyNormal(ctx context.Context, latencyMs float64) er
 
 func (s *service) NotifySlowSpeed(ctx context.Context, result models.SpeedTestResult, minDownloadMbps, minUploadMbps float64) error {
 	return s.send(ctx, models.NotificationSlowSpeed, slowSpeedMessage(result, minDownloadMbps, minUploadMbps))
+}
+
+func (s *service) NotifySpeedReport(ctx context.Context, result models.SpeedTestResult) error {
+	return s.send(ctx, models.NotificationSpeedReport, speedReportMessage(result))
 }
