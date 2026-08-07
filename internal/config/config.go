@@ -59,6 +59,7 @@ type MonitorConfig struct {
 	FailureThreshold       int     `mapstructure:"failure_threshold"`
 	HighLatencyThresholdMs float64 `mapstructure:"high_latency_threshold_ms"`
 	HighLatencyOccurrences int     `mapstructure:"high_latency_occurrences"`
+	HighLatencyCooldownMin int     `mapstructure:"high_latency_cooldown_min"`
 }
 
 // SpeedTestConfig configures periodic speed tests.
@@ -147,6 +148,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("monitor.failure_threshold", 2)
 	v.SetDefault("monitor.high_latency_threshold_ms", 200)
 	v.SetDefault("monitor.high_latency_occurrences", 5)
+	v.SetDefault("monitor.high_latency_cooldown_min", 60)
 
 	v.SetDefault("speedtest.interval_minutes", 30)
 	v.SetDefault("speedtest.provider", "ookla")

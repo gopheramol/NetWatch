@@ -29,6 +29,7 @@ type Service struct {
 	threshold              int
 	highLatencyThresholdMs float64
 	highLatencyOccurrences int
+	highLatencyCooldown    time.Duration
 
 	mu                     sync.Mutex
 	consecutiveFailures    int
@@ -37,7 +38,9 @@ type Service struct {
 	lastCheck              *models.ConnectivityCheck
 	uptimeSince            time.Time
 	consecutiveHighLatency int
+	consecutiveNormalChecks int
 	isHighLatency          bool
+	lastHighLatencyAlert   time.Time
 }
 
 // NewService builds the connectivity Service, restoring in-memory state
@@ -51,6 +54,11 @@ func NewService(
 	notifier telegram.Notifier,
 	logger *zap.Logger,
 ) *Service {
+	cooldownMin := cfg.HighLatencyCooldownMin
+	if cooldownMin <= 0 {
+		cooldownMin = 60
+	}
+
 	s := &Service{
 		checker:                NewChecker(cfg),
 		connRepo:               connRepo,
@@ -62,6 +70,7 @@ func NewService(
 		threshold:              cfg.FailureThreshold,
 		highLatencyThresholdMs: cfg.HighLatencyThresholdMs,
 		highLatencyOccurrences: cfg.HighLatencyOccurrences,
+		highLatencyCooldown:    time.Duration(cooldownMin) * time.Minute,
 		currentStatus:          models.StatusUp,
 		uptimeSince:            time.Now(),
 	}
@@ -161,18 +170,25 @@ func (s *Service) RunCheck(ctx context.Context) error {
 	return nil
 }
 
-// evaluateLatency tracks a separate consecutive-occurrences streak for
-// "connection is up but slow", independent of the outage state machine, and
-// alerts on the high/normal transition. Caller must hold s.mu.
+// evaluateLatency tracks high latency occurrences with smart throttling (1-hour cooldown)
+// and hysteresis stabilization to avoid alert flapping. Caller must hold s.mu.
 func (s *Service) evaluateLatency(ctx context.Context, check models.ConnectivityCheck) {
 	if s.highLatencyThresholdMs <= 0 || s.highLatencyOccurrences <= 0 {
 		return
 	}
 
+	cooldown := s.highLatencyCooldown
+	if cooldown <= 0 {
+		cooldown = 1 * time.Hour
+	}
+
 	if check.LatencyMs <= s.highLatencyThresholdMs {
-		s.consecutiveHighLatency = 0
-		if s.isHighLatency {
+		s.consecutiveNormalChecks++
+		// Require consecutive normal checks to prevent alert flapping
+		if s.isHighLatency && s.consecutiveNormalChecks >= s.highLatencyOccurrences {
 			s.isHighLatency = false
+			s.consecutiveHighLatency = 0
+			s.consecutiveNormalChecks = 0
 			if err := s.notifier.NotifyLatencyNormal(ctx, check.LatencyMs); err != nil {
 				s.logger.Error("monitor: failed to send latency normal notification", zap.Error(err))
 			}
@@ -181,13 +197,24 @@ func (s *Service) evaluateLatency(ctx context.Context, check models.Connectivity
 		return
 	}
 
+	s.consecutiveNormalChecks = 0
 	s.consecutiveHighLatency++
-	if s.consecutiveHighLatency == s.highLatencyOccurrences && !s.isHighLatency {
+
+	if s.consecutiveHighLatency >= s.highLatencyOccurrences {
 		s.isHighLatency = true
-		if err := s.notifier.NotifyHighLatency(ctx, check.LatencyMs, s.highLatencyThresholdMs); err != nil {
-			s.logger.Error("monitor: failed to send high latency notification", zap.Error(err))
+
+		// Smart Throttling: Only send high latency alert at most once per hour (cooldown)
+		if time.Since(s.lastHighLatencyAlert) >= cooldown {
+			s.lastHighLatencyAlert = time.Now()
+			if err := s.notifier.NotifyHighLatency(ctx, check.LatencyMs, s.highLatencyThresholdMs); err != nil {
+				s.logger.Error("monitor: failed to send high latency notification", zap.Error(err))
+			}
+			s.logger.Warn("monitor: high latency detected (throttled)",
+				zap.Float64("latency_ms", check.LatencyMs),
+				zap.Float64("threshold_ms", s.highLatencyThresholdMs),
+				zap.Duration("cooldown", cooldown),
+			)
 		}
-		s.logger.Warn("monitor: high latency detected", zap.Float64("latency_ms", check.LatencyMs), zap.Float64("threshold_ms", s.highLatencyThresholdMs))
 	}
 }
 

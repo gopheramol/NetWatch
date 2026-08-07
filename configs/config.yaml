@@ -24,6 +24,8 @@ monitor:
   # latency" alert fires (separate from a full outage).
   high_latency_threshold_ms: 200
   high_latency_occurrences: 5
+  # Minimum minutes between high latency Telegram alert notifications (throttled to avoid alert spam)
+  high_latency_cooldown_min: 60
 
 speedtest:
   interval_minutes: 30
