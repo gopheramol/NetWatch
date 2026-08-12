@@ -146,7 +146,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("monitor.dns_host", "google.com")
 	v.SetDefault("monitor.timeout_seconds", 5)
 	v.SetDefault("monitor.failure_threshold", 2)
-	v.SetDefault("monitor.high_latency_threshold_ms", 200)
+	v.SetDefault("monitor.high_latency_threshold_ms", 1000)
 	v.SetDefault("monitor.high_latency_occurrences", 5)
 	v.SetDefault("monitor.high_latency_cooldown_min", 60)
 

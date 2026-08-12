@@ -10,6 +10,7 @@ import (
 
 	"github.com/gopheramol/NetWatch/internal/analytics"
 	"github.com/gopheramol/NetWatch/internal/battery"
+	"github.com/gopheramol/NetWatch/internal/models"
 	"github.com/gopheramol/NetWatch/internal/monitor"
 	"github.com/gopheramol/NetWatch/internal/repository"
 	"github.com/gopheramol/NetWatch/internal/services/retention"
@@ -30,6 +31,7 @@ type Scheduler struct {
 	analytics     analytics.Engine
 	notifier      telegram.Notifier
 	settingsRepo  repository.SettingsRepository
+	connRepo      repository.ConnectivityRepository
 	logger        *zap.Logger
 
 	defaultMonitorInterval   time.Duration
@@ -68,6 +70,7 @@ func New(
 	engine analytics.Engine,
 	notifier telegram.Notifier,
 	settingsRepo repository.SettingsRepository,
+	connRepo repository.ConnectivityRepository,
 	logger *zap.Logger,
 ) *Scheduler {
 	return &Scheduler{
@@ -79,6 +82,7 @@ func New(
 		analytics:                engine,
 		notifier:                 notifier,
 		settingsRepo:             settingsRepo,
+		connRepo:                 connRepo,
 		logger:                   logger,
 		defaultMonitorInterval:   cfg.MonitorInterval,
 		defaultSpeedtestInterval: cfg.SpeedTestInterval,
@@ -133,6 +137,9 @@ func (s *Scheduler) Start(ctx context.Context) {
 	}
 
 
+	if _, err := s.cron.AddFunc("0 * * * *", func() { s.sendHourlyLatencySummary(ctx) }); err != nil {
+		s.logger.Error("scheduler: failed to register hourly latency summary job", zap.Error(err))
+	}
 	if _, err := s.cron.AddFunc("59 23 * * *", func() { s.sendDailySummary(ctx) }); err != nil {
 		s.logger.Error("scheduler: failed to register daily summary job", zap.Error(err))
 	}
@@ -219,6 +226,45 @@ func (s *Scheduler) sendWeeklySummary(ctx context.Context) {
 	}
 	if err := s.notifier.NotifyWeeklySummary(ctx, days); err != nil {
 		s.logger.Error("scheduler: failed to send weekly summary", zap.Error(err))
+	}
+}
+
+func (s *Scheduler) sendHourlyLatencySummary(ctx context.Context) {
+	now := time.Now()
+	from := now.Add(-1 * time.Hour)
+	checks, err := s.connRepo.Range(ctx, from, now, 0)
+	if err != nil {
+		s.logger.Error("scheduler: failed to load hourly checks for latency summary", zap.Error(err))
+		return
+	}
+
+	var (
+		sum        float64
+		minLatency float64 = -1
+		maxLatency float64 = 0
+		count      int
+	)
+	for _, c := range checks {
+		if c.Status == models.StatusUp && c.LatencyMs > 0 {
+			if minLatency < 0 || c.LatencyMs < minLatency {
+				minLatency = c.LatencyMs
+			}
+			if c.LatencyMs > maxLatency {
+				maxLatency = c.LatencyMs
+			}
+			sum += c.LatencyMs
+			count++
+		}
+	}
+
+	if count == 0 {
+		s.logger.Info("scheduler: no valid latency checks in the past hour for summary")
+		return
+	}
+
+	avgLatency := sum / float64(count)
+	if err := s.notifier.NotifyHourlyLatencySummary(ctx, avgLatency, minLatency, maxLatency, count); err != nil {
+		s.logger.Error("scheduler: failed to send hourly latency summary", zap.Error(err))
 	}
 }
 

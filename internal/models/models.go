@@ -109,6 +109,7 @@ const (
 	NotificationLatencyNormal NotificationType = "latency_normal"
 	NotificationSlowSpeed     NotificationType = "slow_speed"
 	NotificationSpeedReport   NotificationType = "speed_report"
+	NotificationHourlyLatency NotificationType = "hourly_latency"
 )
 
 // Notification records a sent (or attempted) Telegram notification for audit purposes.

@@ -22,7 +22,7 @@ monitor:
   failure_threshold: 2
   # Consecutive checks with latency above this many ms before a "high
   # latency" alert fires (separate from a full outage).
-  high_latency_threshold_ms: 200
+  high_latency_threshold_ms: 1000
   high_latency_occurrences: 5
   # Minimum minutes between high latency Telegram alert notifications (throttled to avoid alert spam)
   high_latency_cooldown_min: 60

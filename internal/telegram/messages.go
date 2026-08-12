@@ -185,6 +185,17 @@ func slowSpeedMessage(result models.SpeedTestResult, minDownloadMbps, minUploadM
 	)
 }
 
+func hourlyLatencyMessage(avgLatency, minLatency, maxLatency float64, checkCount int) string {
+	return fmt.Sprintf(
+		"⚡ <b>Hourly Latency Summary</b>\n\n"+
+			"📊 Average: %.1f ms\n"+
+			"📉 Low (Min): %.1f ms\n"+
+			"📈 Peak (Max): %.1f ms\n"+
+			"🔢 Checks: %d",
+		avgLatency, minLatency, maxLatency, checkCount,
+	)
+}
+
 func valueOrDash(s string) string {
 	if s == "" {
 		return "—"

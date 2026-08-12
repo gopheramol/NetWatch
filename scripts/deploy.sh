@@ -22,20 +22,38 @@ fi
 cd "$(dirname "$0")/.."
 
 echo "==> Syncing repo to ${HOST}:${REMOTE_DIR}"
-rsync -avz --delete \
-  --exclude='.git' \
-  --exclude='node_modules' \
-  --exclude='web/node_modules' \
-  --exclude='.next' \
-  --exclude='web/.next' \
-  --exclude='data' \
-  --exclude='*.db' \
-  --exclude='*.log' \
-  --exclude='.env' \
-  --exclude='.env.local' \
-  --exclude='web/.env.local' \
-  --exclude='bin' \
-  ./ "${HOST}:${REMOTE_DIR}/"
+if ssh "$HOST" "command -v rsync >/dev/null 2>&1"; then
+  rsync -avz --delete \
+    --exclude='.git' \
+    --exclude='node_modules' \
+    --exclude='web/node_modules' \
+    --exclude='.next' \
+    --exclude='web/.next' \
+    --exclude='data' \
+    --exclude='*.db' \
+    --exclude='*.log' \
+    --exclude='.env' \
+    --exclude='.env.local' \
+    --exclude='web/.env.local' \
+    --exclude='bin' \
+    ./ "${HOST}:${REMOTE_DIR}/"
+else
+  echo "    rsync not found on remote host — syncing via tar stream over SSH."
+  ssh "$HOST" "mkdir -p ${REMOTE_DIR}"
+  tar --exclude='.git' \
+    --exclude='node_modules' \
+    --exclude='web/node_modules' \
+    --exclude='.next' \
+    --exclude='web/.next' \
+    --exclude='data' \
+    --exclude='*.db' \
+    --exclude='*.log' \
+    --exclude='.env' \
+    --exclude='.env.local' \
+    --exclude='web/.env.local' \
+    --exclude='bin' \
+    -czf - . | ssh "$HOST" "tar -xzf - -C ${REMOTE_DIR}"
+fi
 
 echo "==> Checking remote .env"
 if ! ssh "$HOST" "test -f ${REMOTE_DIR}/.env"; then

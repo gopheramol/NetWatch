@@ -111,7 +111,7 @@ func run(cfg *config.Config, logger *zap.Logger) error {
 		BatteryInterval:    cfg.Battery.CheckInterval,
 		SysMetricsEnabled:  cfg.SysMetrics.Enabled,
 		SysMetricsInterval: time.Duration(cfg.SysMetrics.IntervalSeconds) * time.Second,
-	}, monitorSvc, speedtestSvc, retentionSvc, batterySvc, sysMetricsSvc, engine, notifier, settingsRepo, logger)
+	}, monitorSvc, speedtestSvc, retentionSvc, batterySvc, sysMetricsSvc, engine, notifier, settingsRepo, connRepo, logger)
 
 	router := api.NewRouter(api.Dependencies{
 		MonitorSvc:    monitorSvc,
