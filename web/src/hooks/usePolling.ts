@@ -35,7 +35,7 @@ export function usePolling<T>(fn: () => Promise<T>, intervalMs: number): Polling
     load();
     const id = setInterval(load, intervalMs);
     return () => clearInterval(id);
-  }, [load, intervalMs]);
+  }, [intervalMs]);
 
   return { data, error, loading, refresh: load };
 }

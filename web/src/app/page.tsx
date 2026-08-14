@@ -26,8 +26,8 @@ export default function Dashboard() {
   const speedLatest = usePolling(api.getSpeedLatest, 30000);
   const speedHistory = usePolling(() => api.getSpeedHistory({ limit: 80 }), 30000);
   const downtime = usePolling(() => api.getDowntime({ limit: 25 }), 15000);
-  const daily = usePolling(() => api.getAnalyticsDailyRange(), 60000);
-  const monthly = usePolling(() => api.getAnalyticsMonthlyRange(), 60000);
+  const daily = usePolling(api.getAnalyticsDailyRange, 60000);
+  const monthly = usePolling(api.getAnalyticsMonthlyRange, 60000);
 
   async function runSpeedTestNow() {
     setRunningSpeedTest(true);
