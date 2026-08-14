@@ -44,5 +44,17 @@ services:
     depends_on:
       - backend
 
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: netwatch-tunnel
+    restart: unless-stopped
+    command: tunnel --url http://frontend:3000
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    depends_on:
+      - frontend
+
 volumes:
   netwatch-data:
