@@ -37,6 +37,7 @@ services:
       - "3000:3000"
     environment:
       - NODE_OPTIONS=--max-old-space-size=512
+      - INTERNAL_API_BASE_URL=http://netwatch-backend:8080
     deploy:
       resources:
         limits:
