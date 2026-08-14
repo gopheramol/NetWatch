@@ -39,12 +39,16 @@ func (r *boltSettingsRepository) Get(ctx context.Context) (*models.Settings, err
 		return nil, err
 	}
 
-	// Sync environment/config Telegram credentials if updated on startup
+	// Sync environment/config Telegram credentials and report settings if updated on startup
 	if r.defaults.TelegramBotToken != "" && settings.TelegramBotToken != r.defaults.TelegramBotToken {
 		settings.TelegramBotToken = r.defaults.TelegramBotToken
 		if r.defaults.TelegramChatID != "" {
 			settings.TelegramChatID = r.defaults.TelegramChatID
 		}
+		_ = database.Put(r.bolt, database.BucketSettings, settingsKey, &settings)
+	}
+	if settings.SpeedReportEnabled != r.defaults.SpeedReportEnabled {
+		settings.SpeedReportEnabled = r.defaults.SpeedReportEnabled
 		_ = database.Put(r.bolt, database.BucketSettings, settingsKey, &settings)
 	}
 

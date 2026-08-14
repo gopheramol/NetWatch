@@ -35,7 +35,7 @@ speedtest:
   min_upload_mbps: 0
   # Send a Telegram report after every completed speed test (not just
   # slow-speed alerts).
-  report_enabled: true
+  report_enabled: false
 
 retention:
   raw_data_days: 90

@@ -137,9 +137,6 @@ func (s *Scheduler) Start(ctx context.Context) {
 	}
 
 
-	if _, err := s.cron.AddFunc("0 * * * *", func() { s.sendHourlyLatencySummary(ctx) }); err != nil {
-		s.logger.Error("scheduler: failed to register hourly latency summary job", zap.Error(err))
-	}
 	if _, err := s.cron.AddFunc("59 23 * * *", func() { s.sendDailySummary(ctx) }); err != nil {
 		s.logger.Error("scheduler: failed to register daily summary job", zap.Error(err))
 	}

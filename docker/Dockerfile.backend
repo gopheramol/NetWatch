@@ -13,7 +13,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/netwatc
 
 FROM alpine:3.20
 RUN apk add --no-cache ca-certificates tzdata && \
-    addgroup -S netwatch && adduser -S netwatch -G netwatch
+    addgroup -g 10001 -S netwatch && adduser -u 10001 -S netwatch -G netwatch
 
 WORKDIR /app
 COPY --from=build /out/netwatch-server ./netwatch-server

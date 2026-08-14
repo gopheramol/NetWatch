@@ -16,7 +16,7 @@ RUN npm run build
 FROM node:22-alpine AS run
 WORKDIR /app
 ENV NODE_ENV=production
-RUN addgroup -S netwatch && adduser -S netwatch -G netwatch
+RUN addgroup -g 10001 -S netwatch && adduser -u 10001 -S netwatch -G netwatch
 
 COPY --from=build /src/.next/standalone ./
 COPY --from=build /src/.next/static ./.next/static
@@ -24,6 +24,6 @@ COPY --from=build /src/public ./public
 
 USER netwatch
 EXPOSE 3000
-ENV PORT=3000 HOSTNAME=0.0.0.0
+ENV PORT=3000 HOSTNAME=0.0.0.0 NODE_OPTIONS="--max-old-space-size=512"
 
 CMD ["node", "server.js"]
