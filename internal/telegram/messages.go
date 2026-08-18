@@ -121,8 +121,24 @@ func serviceStartedMessage() string {
 	return "🚀 <b>NetWatch Started</b>\n\nMonitoring is now running."
 }
 
-func serviceStoppedMessage() string {
-	return "🛑 <b>NetWatch Stopped</b>\n\nMonitoring has shut down — no alerts will fire until it's back up."
+func serviceRecoveredMessage(lastSeen time.Time) string {
+	return fmt.Sprintf(
+		"🚀 <b>NetWatch Started</b>\n\n"+
+			"⚠️ Reason: previous session ended unexpectedly — it never shut down cleanly.\n"+
+			"Likely causes: OOM kill (container memory limit), crash, host power loss, or network/Docker daemon interruption.\n"+
+			"🕓 Last seen: %s\n\n"+
+			"Monitoring is running again now.",
+		lastSeen.Format("2006-01-02 15:04:05"),
+	)
+}
+
+func serviceStoppedMessage(reason string) string {
+	return fmt.Sprintf(
+		"🛑 <b>NetWatch Stopped</b>\n\n"+
+			"❗ Reason: %s\n\n"+
+			"No alerts will fire until it's back up.",
+		reason,
+	)
 }
 
 func batteryLowMessage(pct float64, thresholdPct float64) string {

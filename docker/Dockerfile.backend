@@ -23,6 +23,7 @@ RUN mkdir -p /app/data && chown -R netwatch:netwatch /app
 USER netwatch
 
 VOLUME ["/app/data"]
+ENV PORT=8080 GOMEMLIMIT=768MiB
 EXPOSE 8080
 
 ENTRYPOINT ["./netwatch-server"]

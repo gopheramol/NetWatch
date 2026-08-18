@@ -20,7 +20,8 @@ type Notifier interface {
 	NotifyWeeklySummary(ctx context.Context, days []models.DailyStats) error
 	NotifyTest(ctx context.Context) error
 	NotifyServiceStarted(ctx context.Context) error
-	NotifyServiceStopped(ctx context.Context) error
+	NotifyServiceRecovered(ctx context.Context, lastSeen time.Time) error
+	NotifyServiceStopped(ctx context.Context, reason string) error
 	NotifyBatteryLow(ctx context.Context, pct, thresholdPct float64) error
 	NotifyBatteryRestored(ctx context.Context, pct float64) error
 	NotifyHighLatency(ctx context.Context, latencyMs, thresholdMs float64) error
@@ -107,8 +108,12 @@ func (s *service) NotifyServiceStarted(ctx context.Context) error {
 	return s.send(ctx, models.NotificationServiceUp, serviceStartedMessage())
 }
 
-func (s *service) NotifyServiceStopped(ctx context.Context) error {
-	return s.send(ctx, models.NotificationServiceDown, serviceStoppedMessage())
+func (s *service) NotifyServiceRecovered(ctx context.Context, lastSeen time.Time) error {
+	return s.send(ctx, models.NotificationServiceUp, serviceRecoveredMessage(lastSeen))
+}
+
+func (s *service) NotifyServiceStopped(ctx context.Context, reason string) error {
+	return s.send(ctx, models.NotificationServiceDown, serviceStoppedMessage(reason))
 }
 
 func (s *service) NotifyBatteryLow(ctx context.Context, pct, thresholdPct float64) error {

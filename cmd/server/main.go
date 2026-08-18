@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"syscall"
 	"time"
@@ -21,6 +22,7 @@ import (
 	"github.com/gopheramol/NetWatch/internal/battery"
 	"github.com/gopheramol/NetWatch/internal/config"
 	"github.com/gopheramol/NetWatch/internal/database"
+	"github.com/gopheramol/NetWatch/internal/heartbeat"
 	"github.com/gopheramol/NetWatch/internal/models"
 	"github.com/gopheramol/NetWatch/internal/monitor"
 	"github.com/gopheramol/NetWatch/internal/repository"
@@ -134,15 +136,56 @@ func run(cfg *config.Config, logger *zap.Logger) error {
 		Handler: router,
 	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
+	// sigCh (rather than signal.NotifyContext) lets us report *which* signal
+	// triggered shutdown, so the Telegram message can say SIGTERM (docker
+	// stop/restart) vs SIGINT (manual interrupt) instead of a generic reason.
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var caughtSignal os.Signal
+	go func() {
+		caughtSignal = <-sigCh
+		cancel()
+	}()
 
 	sched.Start(ctx)
 	botListener.Start(ctx)
 
-	if err := notifier.NotifyServiceStarted(ctx); err != nil {
+	// A heartbeat file survives process restarts. If it says the previous
+	// run never shut down cleanly, that run was killed without a chance to
+	// run any code — a SIGKILL from an OOM-kill, `docker kill`, a host
+	// crash, or a power/network loss. We can't know which, but we can say
+	// "not a normal stop" and report when it was last seen alive.
+	heartbeatPath := filepath.Join(filepath.Dir(cfg.Database.Path), ".heartbeat.json")
+	tracker := heartbeat.New(heartbeatPath)
+	if prev, ok := tracker.Previous(); ok && !prev.Clean {
+		if err := notifier.NotifyServiceRecovered(ctx, prev.LastSeen); err != nil {
+			logger.Warn("failed to send service-recovered notification", zap.Error(err))
+		}
+	} else if err := notifier.NotifyServiceStarted(ctx); err != nil {
 		logger.Warn("failed to send service-started notification", zap.Error(err))
 	}
+	if err := tracker.Start(time.Now()); err != nil {
+		logger.Warn("heartbeat: failed to record startup", zap.Error(err))
+	}
+
+	heartbeatDone := make(chan struct{})
+	go func() {
+		defer close(heartbeatDone)
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if err := tracker.Touch(time.Now()); err != nil {
+					logger.Warn("heartbeat: failed to update", zap.Error(err))
+				}
+			}
+		}
+	}()
 
 	serverErrCh := make(chan error, 1)
 	go func() {
@@ -154,21 +197,38 @@ func run(cfg *config.Config, logger *zap.Logger) error {
 		serverErrCh <- nil
 	}()
 
+	stopReason := "graceful shutdown, unknown trigger"
 	select {
 	case <-ctx.Done():
-		logger.Info("server: shutdown signal received")
+		stopReason = shutdownReasonFromSignal(caughtSignal)
+		logger.Info("server: shutdown signal received", zap.String("reason", stopReason))
 	case err := <-serverErrCh:
 		if err != nil {
+			stopReason = fmt.Sprintf("server error: %v", err)
+			notifyCtx, notifyCancel := context.WithTimeout(context.Background(), cfg.Server.ShutdownTimeout)
+			if notifyErr := notifier.NotifyServiceStopped(notifyCtx, stopReason); notifyErr != nil {
+				logger.Warn("failed to send service-stopped notification", zap.Error(notifyErr))
+			}
+			notifyCancel()
+			if hbErr := tracker.MarkClean(time.Now()); hbErr != nil {
+				logger.Warn("heartbeat: failed to mark clean shutdown", zap.Error(hbErr))
+			}
+			cancel()
+			<-heartbeatDone
 			return fmt.Errorf("http server error: %w", err)
 		}
 	}
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.Server.ShutdownTimeout)
-	defer cancel()
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), cfg.Server.ShutdownTimeout)
+	defer shutdownCancel()
 
-	if err := notifier.NotifyServiceStopped(shutdownCtx); err != nil {
+	if err := notifier.NotifyServiceStopped(shutdownCtx, stopReason); err != nil {
 		logger.Warn("failed to send service-stopped notification", zap.Error(err))
 	}
+	if err := tracker.MarkClean(time.Now()); err != nil {
+		logger.Warn("heartbeat: failed to mark clean shutdown", zap.Error(err))
+	}
+	<-heartbeatDone
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {
 		logger.Error("server: graceful shutdown failed", zap.Error(err))
 	}
@@ -176,4 +236,19 @@ func run(cfg *config.Config, logger *zap.Logger) error {
 
 	logger.Info("server: shutdown complete")
 	return nil
+}
+
+// shutdownReasonFromSignal turns the OS signal that triggered shutdown into
+// a human-readable reason for the Telegram notification.
+func shutdownReasonFromSignal(sig os.Signal) string {
+	switch sig {
+	case syscall.SIGTERM:
+		return "SIGTERM — container/service stop requested (docker stop, compose down, or redeploy)"
+	case syscall.SIGINT:
+		return "SIGINT — manual interrupt (Ctrl+C)"
+	case nil:
+		return "graceful shutdown, unknown trigger"
+	default:
+		return fmt.Sprintf("signal: %v", sig)
+	}
 }
